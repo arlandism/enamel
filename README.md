@@ -1,1 +1,1 @@
-# Enamel - A less reliable Varnish knock-off
+# Enamel - A Varnish knock-off
