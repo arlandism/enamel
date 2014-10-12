@@ -2,25 +2,38 @@ module Enamel
 
   class Cache
 
-    STORE = []
+    @@store = {}
 
     def self.response(env)
-      backend_response = Backend.response(env)[:resp]
-      if STORE.include?(env["REQUEST_URI"])
-        backend_response[1].merge!("X-Enamel" => "hit", "X-Enamel-Age" => "5")
+      if @@store.include?(env["REQUEST_URI"]) && !expired?(env["REQUEST_URI"])
+        response = @@store[env["REQUEST_URI"]][:resp]
+        response[1].merge!("X-Enamel" => "hit")
       else
-        backend_response[1].merge!("X-Enamel" => "miss")
+        be_response = Backend.response(env)
+        response = be_response[:resp]
+        response[1].merge!("X-Enamel" => "miss")
+        record(env["REQUEST_URI"], be_response[:ttl], be_response)
       end
-      record(env["REQUEST_URI"])
-      backend_response
+      response
     end
 
-    def self.record(req)
-      STORE << req
+    def self.record(req, ttl, resp)
+      @@store[req] = {
+        :resource => req,
+        :ttl => ttl,
+        :recorded_at => Time.now,
+        :resp => resp[:resp]
+      }
     end
 
     def self.purge
-      STORE.clear
+      @@store.clear
+    end
+
+    def self.expired?(resource)
+      ttl = @@store[resource][:ttl] || 0
+      recorded_at = @@store[resource][:recorded_at]
+      ttl < Time.now - recorded_at
     end
   end
 
